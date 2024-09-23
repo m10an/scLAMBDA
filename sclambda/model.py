@@ -77,11 +77,6 @@ class Model(object):
         # split datasets
         print("Spliting data...")
         self.adata_train = self.adata[self.adata.obs[split_name].values == 'train']
-        # self.adata_train = self.adata_train[self.adata_train.obs['condition'].values != 'ctrl']
-        # # self.adata_ctrl = self.adata[self.adata.obs['condition'].values == 'ctrl']
-        # # self.adata_ctrl = self.adata_ctrl[np.random.choice(self.adata_ctrl.shape[0],
-        # #                                                    self.adata_train.shape[0])]
-        # # self.adata_train = ad.concat([self.adata_train, self.adata_ctrl])
         self.adata_val = self.adata[self.adata.obs[split_name].values == 'val']
         self.pert_val = np.unique(self.adata_val.obs['condition'].values)
 
@@ -209,11 +204,11 @@ class Model(object):
                                      (self.ctrl_x.shape[0], 1))).float().to(self.device)
             x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
             if return_type == 'cells':
-                adata_pred = ad.AnnData(X=(x_hat.detach().cpu().numpy() + 1*self.ctrl_mean.reshape(1, -1)))
+                adata_pred = ad.AnnData(X=(x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1)))
                 adata_pred.obs['condition'] = i
                 res[i] = adata_pred
             elif return_type == 'mean':
-                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + 1*self.ctrl_mean
+                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + self.ctrl_mean
                 res[i] = x_hat
             else:
                 raise ValueError("return_type can only be 'mean' or 'cells'.")
@@ -235,13 +230,13 @@ class Model(object):
                                      (n_cells, 1))).float().to(self.device)
             s = self.Net.Encoder_p(val_p)
             z = torch.randn(n_cells, self.latent_dim).to(self.device)
-            x_hat = self.Net.Decoder_x(z+s)#self.Net.softplus(self.Net.Decoder_x(z+s))
+            x_hat = self.Net.Decoder_x(z+s)
             if return_type == 'cells':
-                adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy() + 1*self.ctrl_mean.reshape(1, -1))
+                adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1))
                 adata_pred.obs['condition'] = i
                 res[i] = adata_pred
             elif return_type == 'mean':
-                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + 1*self.ctrl_mean
+                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + self.ctrl_mean
                 res[i] = x_hat
             else:
                 raise ValueError("return_type can only be 'mean' or 'cells'.")

@@ -23,7 +23,7 @@ class Net(nn.Module):
         mean_z, log_var_z = self.Encoder_x(x)
         z = self.reparameterization(mean_z, torch.exp(0.5 * log_var_z)) # takes exponential function (log var -> var)
         s = self.Encoder_p(p)
-        x_hat = self.Decoder_x(z+s)#self.softplus(self.Decoder_x(z+s))
+        x_hat = self.Decoder_x(z+s)
         p_hat = self.Decoder_p(s)
         
         return x_hat, p_hat, mean_z, log_var_z, s
