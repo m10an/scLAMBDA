@@ -66,6 +66,11 @@ def get_simulation_split(unique_perts,
                    t in train_gene_candidates]) == 1]
     pert_test.extend(combo_seen1)
     pert_combo = np.setdiff1d(pert_combo, combo_seen1)
+    # Combo seen 0 in the testing set
+    combo_seen0 = [x for x in pert_combo if len([t for t in x.split('+') if
+                   t in (list(train_gene_candidates)+['ctrl'])]) == 0]
+    pert_test.extend(combo_seen0)
+    pert_combo = np.setdiff1d(pert_combo, combo_seen0)
     # Sample the combo seen 2 for training
     pert_combo_train = np.random.choice(pert_combo, int(len(pert_combo) * combo_seen2_train_frac), 
                        replace = False)
@@ -76,10 +81,6 @@ def get_simulation_split(unique_perts,
     unseen_single = np.intersect1d([(g+'+ctrl') for g in ood_genes]+[('ctrl+'+g) for g in ood_genes],
                     unique_perts)
     pert_test.extend(unseen_single)
-    # Combo seen 0 in the testing set
-    combo_seen0 = [x for x in pert_combo if len([t for t in x.split('+') if
-                   t in (list(train_gene_candidates)+['ctrl'])]) == 0]
-    pert_test.extend(combo_seen0)
     
     return pert_train, pert_test, {'combo_seen0': combo_seen0,
                                    'combo_seen1': combo_seen1,

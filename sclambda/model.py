@@ -26,7 +26,7 @@ class Model(object):
                  training_epochs = 200,
                  batch_size = 500,
                  lambda_MI = 200,
-                 eps = 0.002,
+                 eps = 0.001,
                  seed = 1234,
                  model_path = "models",
                  ):
@@ -41,7 +41,7 @@ class Model(object):
             torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.benchmark = True
 
-        self.adata = adata
+        self.adata = adata.copy()
         self.gene_emb = gene_emb
         self.x_dim = adata.shape[1]
         self.p_dim = gene_emb[list(gene_emb.keys())[0]].shape[0]
@@ -68,16 +68,22 @@ class Model(object):
             self.pert_emb[i] = pert_emb_p
         self.adata.obsm['pert_emb'] = self.pert_emb_cells
 
-        # split datasets
-        print("Spliting data...")
-        self.adata_train = adata[adata.obs[split_name].values == 'train']
-        self.adata_val = adata[adata.obs[split_name].values == 'val']
-        self.pert_val = np.unique(self.adata_val.obs['condition'].values)
-
         # control cells
         ctrl_x = adata[adata.obs['condition'].values == 'ctrl'].X
         self.ctrl_mean = np.mean(ctrl_x, axis=0)
-        self.ctrl_x = torch.from_numpy(ctrl_x).float().to(self.device)
+        self.ctrl_x = torch.from_numpy(ctrl_x - self.ctrl_mean.reshape(1, -1)).float().to(self.device)
+        self.adata.X = self.adata.X - self.ctrl_mean.reshape(1, -1)
+
+        # split datasets
+        print("Spliting data...")
+        self.adata_train = self.adata[self.adata.obs[split_name].values == 'train']
+        # self.adata_train = self.adata_train[self.adata_train.obs['condition'].values != 'ctrl']
+        # # self.adata_ctrl = self.adata[self.adata.obs['condition'].values == 'ctrl']
+        # # self.adata_ctrl = self.adata_ctrl[np.random.choice(self.adata_ctrl.shape[0],
+        # #                                                    self.adata_train.shape[0])]
+        # # self.adata_train = ad.concat([self.adata_train, self.adata_ctrl])
+        self.adata_val = self.adata[self.adata.obs[split_name].values == 'val']
+        self.pert_val = np.unique(self.adata_val.obs['condition'].values)
 
         self.train_data = PertDataset(torch.from_numpy(self.adata_train.X).float().to(self.device), 
                                       torch.from_numpy(self.adata_train.obsm['pert_emb']).float().to(self.device))
@@ -85,9 +91,9 @@ class Model(object):
 
         self.pert_delta = {}
         self.pert_var = {}
-        for i in np.unique(adata.obs['condition'].values):
-            adata_i = adata[adata.obs['condition'].values == i]
-            delta_i = np.mean(adata_i.X, axis=0) - self.ctrl_mean
+        for i in np.unique(self.adata.obs['condition'].values):
+            adata_i = self.adata[self.adata.obs['condition'].values == i]
+            delta_i = np.mean(adata_i.X, axis=0)
             self.pert_delta[i] = delta_i
             var_i = np.var(adata_i.X, axis=0)
             self.pert_var[i] = var_i
@@ -126,7 +132,7 @@ class Model(object):
                     x_hat, _, _, _, _ = self.Net(x, p)
                     recon_loss = self.loss_recon(x, x_hat)
                     grads = torch.autograd.grad(recon_loss, p)[0]
-                    p_ae = p + self.eps * torch.sign(grads.data) # generate adversarial examples
+                    p_ae = p + self.eps * torch.norm(p, dim=1).view(-1, 1) * torch.sign(grads.data) # generate adversarial examples
 
                 self.Net.train()
                 x_hat, p_hat, mean_z, log_var_z, s = self.Net(x, p_ae)
@@ -160,7 +166,7 @@ class Model(object):
                         x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
                         x_hat_var = np.var(x_hat.detach().cpu().numpy(), axis=0)
                         x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0)
-                        corr = np.corrcoef(x_hat - self.ctrl_mean, self.pert_delta[i])[0, 1]
+                        corr = np.corrcoef(x_hat, self.pert_delta[i])[0, 1]
                         corr_ls.append(corr)
                         corr_var = np.corrcoef(x_hat_var, self.pert_var[i])[0, 1]
                         corr_var_ls.append(corr_var)
@@ -203,11 +209,39 @@ class Model(object):
                                      (self.ctrl_x.shape[0], 1))).float().to(self.device)
             x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
             if return_type == 'cells':
-                adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy())
+                adata_pred = ad.AnnData(X=(x_hat.detach().cpu().numpy() + 1*self.ctrl_mean.reshape(1, -1)))
                 adata_pred.obs['condition'] = i
                 res[i] = adata_pred
             elif return_type == 'mean':
-                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0)
+                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + 1*self.ctrl_mean
+                res[i] = x_hat
+            else:
+                raise ValueError("return_type can only be 'mean' or 'cells'.")
+        return res
+
+    def generate(self, 
+                 pert_test, # perturbation or a list of perturbations
+                 return_type = 'mean', # return mean or cells
+                 n_cells = 10000 # number of cells to generate
+                 ):
+        self.Net.eval()
+        res = {} 
+        if isinstance(pert_test, str):
+            pert_test = [pert_test]
+        for i in pert_test:
+            genes = i.split('+')
+            pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+            val_p = torch.from_numpy(np.tile(pert_emb_p, 
+                                     (n_cells, 1))).float().to(self.device)
+            s = self.Net.Encoder_p(val_p)
+            z = torch.randn(n_cells, self.latent_dim).to(self.device)
+            x_hat = self.Net.Decoder_x(z+s)#self.Net.softplus(self.Net.Decoder_x(z+s))
+            if return_type == 'cells':
+                adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy() + 1*self.ctrl_mean.reshape(1, -1))
+                adata_pred.obs['condition'] = i
+                res[i] = adata_pred
+            elif return_type == 'mean':
+                x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + 1*self.ctrl_mean
                 res[i] = x_hat
             else:
                 raise ValueError("return_type can only be 'mean' or 'cells'.")

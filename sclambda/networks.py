@@ -23,7 +23,7 @@ class Net(nn.Module):
         mean_z, log_var_z = self.Encoder_x(x)
         z = self.reparameterization(mean_z, torch.exp(0.5 * log_var_z)) # takes exponential function (log var -> var)
         s = self.Encoder_p(p)
-        x_hat = self.softplus(self.Decoder_x(z+s))
+        x_hat = self.Decoder_x(z+s)#self.softplus(self.Decoder_x(z+s))
         p_hat = self.Decoder_p(s)
         
         return x_hat, p_hat, mean_z, log_var_z, s
@@ -56,13 +56,12 @@ class Decoder(nn.Module):
         self.FC_hidden2 = nn.Linear(hidden_dim, hidden_dim)
         self.FC_output = nn.Linear(hidden_dim, output_dim)
         self.LeakyReLU = nn.LeakyReLU(0.2)
-        
+
     def forward(self, x):
         h = self.LeakyReLU(self.FC_hidden(x))
         h = self.LeakyReLU(self.FC_hidden2(h))
-        
-        x_hat = self.FC_output(h)
-        return x_hat
+        out = self.FC_output(h)
+        return out
 
 class MINE(nn.Module):
     def __init__(self, latent_dim, hidden_dim):
