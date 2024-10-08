@@ -12,8 +12,7 @@ class Net(nn.Module):
         self.Decoder_x = Decoder(latent_dim=latent_dim, hidden_dim = hidden_dim, output_dim = x_dim).to(self.device)
         self.Decoder_p = Decoder(latent_dim=latent_dim, hidden_dim = hidden_dim, output_dim = p_dim).to(self.device)
         self.MINE = MINE(latent_dim=latent_dim, hidden_dim=hidden_dim).to(self.device)
-        self.softplus = torch.nn.Softplus(beta=1, threshold=20)
-        
+
     def reparameterization(self, mean, var):
         epsilon = torch.randn_like(var).to(self.device)
         z = mean + var * epsilon # reparameterization trick

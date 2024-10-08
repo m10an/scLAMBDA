@@ -16,7 +16,6 @@ def data_split(adata,
                split_name = 'split',
                train_gene_set_size = 0.75, 
                combo_seen2_train_frac = 0.75,
-               combo_single_split_test_set_fraction = 0.1,
                seed=0):
 
     np.random.seed(seed=seed)
@@ -36,6 +35,15 @@ def data_split(adata,
         map_dict = {x: 'train' for x in train}
         map_dict.update({x: 'val' for x in val})
         map_dict.update({x: 'test' for x in test})
+
+    elif split_type == 'all_train':
+        train = list(adata.obs['condition'].unique())
+        map_dict = {x: 'train' for x in train}
+        test_subgroup = {'combo_seen0': [],
+                         'combo_seen1': [],
+                         'combo_seen2': [],
+                         'unseen_single': []}
+        val_subgroup = test_subgroup.copy()
 
     adata.obs[split_name] = adata.obs['condition'].map(map_dict)
 
