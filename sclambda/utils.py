@@ -45,11 +45,34 @@ def data_split(adata,
                          'unseen_single': []}
         val_subgroup = test_subgroup.copy()
 
+    elif split_type == 'single':
+        train, test, test_subgroup = get_simulation_split_single(unique_perts,
+                                                                 train_gene_set_size=train_gene_set_size)
+        train, val, val_subgroup = get_simulation_split_single(train,
+                                                               0.9)
+        train = list(train)
+        train.append('ctrl')
+        map_dict = {x: 'train' for x in train}
+        map_dict.update({x: 'val' for x in val})
+        map_dict.update({x: 'test' for x in test})
+
     adata.obs[split_name] = adata.obs['condition'].map(map_dict)
 
     return adata, {'train': train,
                    'test_subgroup': test_subgroup, 
                    'val_subgroup': val_subgroup}
+
+def get_simulation_split_single(unique_perts, 
+                                train_gene_set_size):
+    pert_train = []
+    pert_test = []
+    unique_pert_genes = np.unique([g for g in unique_perts if g != 'ctrl'])
+    train_gene_candidates = np.random.choice(unique_pert_genes,
+                            int(len(unique_pert_genes) * train_gene_set_size), replace = False)
+    pert_single_train = train_gene_candidates
+    unseen_single = np.setdiff1d(unique_pert_genes, train_gene_candidates)
+
+    return pert_single_train, unseen_single, {'unseen_single': unseen_single}
 
 
 def get_simulation_split(unique_perts, 

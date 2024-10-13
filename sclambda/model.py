@@ -29,6 +29,7 @@ class Model(object):
                  eps = 0.001,
                  seed = 1234,
                  model_path = "models",
+                 multi_gene = True
                  ):
 
         # add device
@@ -53,6 +54,7 @@ class Model(object):
         self.lambda_MI = lambda_MI
         self.eps = eps
         self.model_path = model_path
+        self.multi_gene = multi_gene
 
         # compute perturbation embeddings
         print("Computing %s-dimentisonal perturbation embeddings for %s cells..." % (self.p_dim, adata.shape[0]))
@@ -85,13 +87,10 @@ class Model(object):
         self.train_dataloader = DataLoader(self.train_data, batch_size=self.batch_size, shuffle=True)
 
         self.pert_delta = {}
-        self.pert_var = {}
         for i in np.unique(self.adata.obs['condition'].values):
             adata_i = self.adata[self.adata.obs['condition'].values == i]
             delta_i = np.mean(adata_i.X, axis=0)
             self.pert_delta[i] = delta_i
-            var_i = np.var(adata_i.X, axis=0)
-            self.pert_var[i] = var_i
 
     def loss_function(self, x, x_hat, p, p_hat, mean_z, log_var_z, s, s_marginal, T):
         reconstruction_loss = 0.5 * torch.mean(torch.sum((x_hat - x)**2, axis=1)) + 0.5 * torch.mean(torch.sum((p_hat - p)**2, axis=1))
@@ -152,23 +151,22 @@ class Model(object):
                 print("\tEpoch", (epoch+1), "complete!", "\t Loss: ", loss.item())
                 if len(self.pert_val) > 0: # If validating
                     self.Net.eval()
-                    corr_ls, corr_var_ls = [], []
+                    corr_ls = []
                     for i in self.pert_val:
-                        genes = i.split('+')
-                        pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+                        if self.multi_gene:
+                            genes = i.split('+')
+                            pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+                        else:
+                            pert_emb_p = self.gene_emb[i]
                         val_p = torch.from_numpy(np.tile(pert_emb_p, 
                                                          (self.ctrl_x.shape[0], 1))).float().to(self.device)
                         x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
-                        x_hat_var = np.var(x_hat.detach().cpu().numpy(), axis=0)
                         x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0)
                         corr = np.corrcoef(x_hat, self.pert_delta[i])[0, 1]
                         corr_ls.append(corr)
-                        corr_var = np.corrcoef(x_hat_var, self.pert_var[i])[0, 1]
-                        corr_var_ls.append(corr_var)
 
                     corr_val = np.mean(corr_ls)
-                    corr_var_val = np.mean(corr_var_ls)
-                    print("Validation correlation delta %.5f, var %.5f" % (corr_val, corr_var_val))
+                    print("Validation correlation delta %.5f" % corr_val)
                     if corr_val > corr_val_best:
                         corr_val_best = corr_val
                         self.model_best = copy.deepcopy(self.Net)
@@ -198,8 +196,11 @@ class Model(object):
         if isinstance(pert_test, str):
             pert_test = [pert_test]
         for i in pert_test:
-            genes = i.split('+')
-            pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+            if self.multi_gene:
+                genes = i.split('+')
+                pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+            else:
+                pert_emb_p = self.gene_emb[i]
             val_p = torch.from_numpy(np.tile(pert_emb_p, 
                                      (self.ctrl_x.shape[0], 1))).float().to(self.device)
             x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
@@ -224,8 +225,11 @@ class Model(object):
         if isinstance(pert_test, str):
             pert_test = [pert_test]
         for i in pert_test:
-            genes = i.split('+')
-            pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+            if self.multi_gene:
+                genes = i.split('+')
+                pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+            else:
+                pert_emb_p = self.gene_emb[i]
             val_p = torch.from_numpy(np.tile(pert_emb_p, 
                                      (n_cells, 1))).float().to(self.device)
             s = self.Net.Encoder_p(val_p)
