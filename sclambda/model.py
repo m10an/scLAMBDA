@@ -25,7 +25,7 @@ class Model(object):
                  latent_dim = 30, hidden_dim = 512,
                  training_epochs = 200,
                  batch_size = 500,
-                 lambda_MI = 200,
+                 lambda_MI = 100,
                  eps = 0.001,
                  seed = 1234,
                  model_path = "models",
@@ -103,7 +103,7 @@ class Model(object):
         return reconstruction_loss
 
     def loss_MINE(self, mean_z, s, s_marginal, T):
-        MI_latent = torch.mean(T(mean_z, s)) - torch.log(torch.sum(torch.exp(T(mean_z, s_marginal))))
+        MI_latent = torch.mean(T(mean_z, s)) - torch.log(torch.mean(torch.exp(T(mean_z, s_marginal))))
         return - MI_latent
 
     def train(self):
