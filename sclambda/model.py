@@ -25,7 +25,7 @@ class Model(object):
                  latent_dim = 30, hidden_dim = 512,
                  training_epochs = 200,
                  batch_size = 500,
-                 lambda_MI = 100,
+                 lambda_MI = 200,
                  eps = 0.001,
                  seed = 1234,
                  model_path = "models",
