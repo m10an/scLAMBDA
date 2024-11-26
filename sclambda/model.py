@@ -218,7 +218,7 @@ class Model(object):
     def generate(self, 
                  pert_test, # perturbation or a list of perturbations
                  return_type = 'mean', # return mean or cells
-                 n_cells = 10000 # number of cells to generate
+                 n_cells = 1000 # number of cells to generate
                  ):
         self.Net.eval()
         res = {} 
