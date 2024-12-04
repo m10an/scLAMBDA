@@ -1,6 +1,6 @@
 # scLAMBDA
 
-*scLAMBDA: A deep generative model for predicting single-cell multi-gene perturbation with LAnguage Model-assisted emBedding-Disentangled Autoencoders*
+*Modeling and predicting single-cell multi-gene perturbation responses with scLAMBDA*
 
 ![scLAMBDA_overview](https://github.com/gefeiwang/scLAMBDA/blob/main/demos/overview.png)
 
