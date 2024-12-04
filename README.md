@@ -2,6 +2,10 @@
 
 *Modeling and predicting single-cell multi-gene perturbation responses with scLAMBDA*
 
+We present scLAMBDA, a deep generative learning framework designed to model and predict single-cell transcriptional responses to genetic perturbations, including single-gene and combinatorial multi-gene perturbations. 
+
+By leveraging the embedding capabilities of large language models, scLAMBDA effectively predicts genetic perturbation outcomes for unobserved target genes or gene combinations. Its disentangled representation learning framework enables the modeling of single-cell level perturbations by separating basal cell representations from salient representations associated with perturbation states, allowing for single-cell level generation and *in silico* prediction of perturbation responses. 
+
 ![scLAMBDA_overview](https://github.com/gefeiwang/scLAMBDA/blob/main/demos/overview.png)
 
 ## Installation
