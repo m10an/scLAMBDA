@@ -9,6 +9,14 @@ By leveraging the embedding capabilities of large language models, scLAMBDA effe
 ![scLAMBDA_overview](https://github.com/gefeiwang/scLAMBDA/blob/main/demos/overview.png)
 
 ## Installation
+scLAMBDA can be installed from from GitHub:
+```bash
+git clone https://github.com/gefeiwang/scLAMBDA.git
+cd scLAMBDA
+conda env update --f environment.yml
+conda activate sclambda
+```
+Normally the installation time is less than 5 minutes.
 
 ## Quick Start
 
