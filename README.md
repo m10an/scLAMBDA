@@ -44,6 +44,7 @@ model = sclambda.model.Model(adata,
 
 model.train()
 ```
+Note that for single-gene perturbations, `multi_gene = False` should be included in the `sclambda.model.Model()` parameters.
 ### Prediction
 Once trained, scLAMBDA can be used for *in silico* predictions. With a list of test perturbations `pert_test`, you can predict control cells using:
 ```python
