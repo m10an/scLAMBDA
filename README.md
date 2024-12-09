@@ -56,4 +56,4 @@ res = model.generate(pert_test, return_type = 'cells')
 ```
 Setting `return_type='mean'` returns the prediction results as the mean gene expression.
 ## Citation
-Gefei Wang, Tianyu Liu, Jia Zhao, Youshu Cheng, Hongyu Zhao. Modeling and predicting single-cell multi-gene perturbation responses with scLAMBDA.
+Gefei Wang, Tianyu Liu, Jia Zhao, Youshu Cheng, Hongyu Zhao. Modeling and predicting single-cell multi-gene perturbation responses with scLAMBDA. bioRxiv 2024; doi: https://doi.org/10.1101/2024.12.04.626878.
