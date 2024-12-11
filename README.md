@@ -55,5 +55,7 @@ Alternatively, you can generate new perturbed cells using:
 res = model.generate(pert_test, return_type = 'cells')
 ```
 Setting `return_type='mean'` returns the prediction results as the mean gene expression.
+## Vignettes
+User can follow the [example](https://github.com/gefeiwang/scLAMBDA/blob/main/demos/Norman_tutorial.ipynb) for training and evaluating scLAMBDA on the Perturb-seq dataset from Norman et al. (https://www.science.org/doi/10.1126/science.aax4438).
 ## Citation
 Gefei Wang, Tianyu Liu, Jia Zhao, Youshu Cheng, Hongyu Zhao. Modeling and predicting single-cell multi-gene perturbation responses with scLAMBDA. bioRxiv 2024; doi: https://doi.org/10.1101/2024.12.04.626878.
