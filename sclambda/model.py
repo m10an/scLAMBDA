@@ -218,7 +218,7 @@ class Model(object):
     def generate(self, 
                  pert_test, # perturbation or a list of perturbations
                  return_type = 'mean', # return mean or cells
-                 n_cells = 1000 # number of cells to generate
+                 n_cells = 10000 # number of cells to generate
                  ):
         self.Net.eval()
         res = {} 
@@ -236,9 +236,7 @@ class Model(object):
             z = torch.randn(n_cells, self.latent_dim).to(self.device)
             x_hat = self.Net.Decoder_x(z+s)
             if return_type == 'cells':
-                adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1))
-                adata_pred.obs['condition'] = i
-                res[i] = adata_pred
+                res[i] = x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1)
             elif return_type == 'mean':
                 x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + self.ctrl_mean
                 res[i] = x_hat
