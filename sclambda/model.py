@@ -106,9 +106,10 @@ class Model(object):
         MI_latent = torch.mean(T(mean_z, s)) - torch.log(torch.mean(torch.exp(T(mean_z, s_marginal))))
         return - MI_latent
 
-    def train(self):
-        self.Net = Net(x_dim = self.x_dim, p_dim = self.p_dim, 
-                       latent_dim = self.latent_dim, hidden_dim = self.hidden_dim)
+    def train(self, retrain=False):
+        if not retrain:
+            self.Net = Net(x_dim = self.x_dim, p_dim = self.p_dim, 
+                           latent_dim = self.latent_dim, hidden_dim = self.hidden_dim)
         params = list(self.Net.Encoder_x.parameters())+list(self.Net.Encoder_p.parameters())+list(self.Net.Decoder_x.parameters())+list(self.Net.Decoder_p.parameters())
         optimizer = Adam(params, lr=0.0005)
         scheduler = StepLR(optimizer, step_size=30, gamma=0.2)
@@ -116,6 +117,25 @@ class Model(object):
         scheduler_MINE = StepLR(optimizer_MINE, step_size=30, gamma=0.2)
 
         corr_val_best = 0
+        if retrain:
+            if len(self.pert_val) > 0: # If validating
+                self.Net.eval()
+                corr_ls = []
+                for i in self.pert_val:
+                    if self.multi_gene:
+                        genes = i.split('+')
+                        pert_emb_p = self.gene_emb[genes[0]] + self.gene_emb[genes[1]]
+                    else:
+                        pert_emb_p = self.gene_emb[i]
+                    val_p = torch.from_numpy(np.tile(pert_emb_p, 
+                                                     (self.ctrl_x.shape[0], 1))).float().to(self.device)
+                    x_hat, p_hat, mean_z, log_var_z, s = self.Net(self.ctrl_x, val_p)
+                    x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0)
+                    corr = np.corrcoef(x_hat, self.pert_delta[i])[0, 1]
+                    corr_ls.append(corr)
+
+                corr_val_best = np.mean(corr_ls)
+                print("Previous best validation correlation delta %.5f" % corr_val_best)
         self.Net.train()
         for epoch in tqdm(range(self.training_epochs)):
             for x, p in self.train_dataloader:
@@ -236,7 +256,9 @@ class Model(object):
             z = torch.randn(n_cells, self.latent_dim).to(self.device)
             x_hat = self.Net.Decoder_x(z+s)
             if return_type == 'cells':
-                res[i] = x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1)
+                # adata_pred = ad.AnnData(X=x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1))
+                # adata_pred.obs['condition'] = i
+                res[i] = x_hat.detach().cpu().numpy() + self.ctrl_mean.reshape(1, -1)#adata_pred
             elif return_type == 'mean':
                 x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0) + self.ctrl_mean
                 res[i] = x_hat
