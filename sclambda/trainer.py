@@ -5,8 +5,6 @@ from tqdm import tqdm
 import numpy as np
 import torch
 import torch.utils.data
-import torch.nn.functional as F
-import torch.optim as optim
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 from scipy.sparse._csr import csr_matrix
@@ -27,6 +25,7 @@ class PertDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return self.x[idx].to(self.device), self.p[idx].to(self.device)
 
+
 class Trainer:
     def __init__(
         self,
@@ -46,7 +45,7 @@ class Trainer:
             torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         )
 
-        self.adata = adata.copy()
+        self.adata = adata
         self.gene_emb = gene_emb
         self.split_name = split_name
         self.x_dim = self.adata.n_vars
@@ -73,18 +72,20 @@ class Trainer:
                 pert_emb_p = self.gene_emb[genes[0]]
             self.pert_emb_cells[adata.obs['condition'].values == i] += pert_emb_p.reshape(1, -1)
             self.pert_emb[i] = pert_emb_p
-        self.adata.obsm['pert_emb'] = self.pert_emb_cells
 
         # control cells
         ctrl_x = adata[adata.obs['condition'].values == 'ctrl'].X
         self.ctrl_mean = np.mean(ctrl_x, axis=0)
         self.ctrl_x = torch.from_numpy(ctrl_x - self.ctrl_mean.reshape(1, -1)).float().to(self.device)
-        self.adata.X = self.adata.X - self.ctrl_mean.reshape(1, -1)
+        X = self.adata.X - self.ctrl_mean.reshape(1, -1)
+        X = X.toarray() if isinstance(X, csr_matrix) else X
 
         # split datasets
         print("Spliting data...")
-        self.adata_train = self.adata[self.adata.obs[self.split_name].values == 'train']
-        self.adata_val = self.adata[self.adata.obs[self.split_name].values == 'val']
+        train_mask = self.adata.obs[self.split_name].values == 'train'
+        val_mask = self.adata.obs[self.split_name].values == 'val'
+        self.adata_train = self.adata[train_mask]
+        self.adata_val = self.adata[val_mask]
         self.pert_val = np.unique(self.adata_val.obs['condition'].values)
 
         self.model = Model(
@@ -98,23 +99,18 @@ class Trainer:
         )
         self.model.to(self.device)
 
-        self.train_data = PertDataset(torch.from_numpy(self.adata_train.X).float().to(self.device), 
-                                      torch.from_numpy(self.adata_train.obsm['pert_emb']).float().to(self.device))
-        # self.train_data = PertDataset(
-        #     x=torch.from_numpy(
-        #         self.adata_train.X.toarray() if isinstance(self.adata.X, csr_matrix) else self.adata_train.X
-        #     ).float().to(self.device),
-        #     p=torch.from_numpy(self.pert_emb_cells).float().to(self.device),
-        #     ctrl_mean=self.model.ctrl_mean
-        # )
+        self.train_data = PertDataset(
+            x=torch.from_numpy(X[train_mask]).float().to(self.device),
+            p=torch.from_numpy(self.pert_emb_cells[train_mask]).float().to(self.device),
+            ctrl_mean=self.model.ctrl_mean,
+        )
         self.train_dataloader = torch.utils.data.DataLoader(
             self.train_data, batch_size=self.batch_size, shuffle=True
         )
 
         self.pert_delta = {}
         for i in np.unique(self.adata.obs['condition'].values):
-            adata_i = self.adata[self.adata.obs['condition'].values == i]
-            delta_i = np.mean(adata_i.X, axis=0)
+            delta_i = np.mean(X[self.adata.obs['condition'].values == i], axis=0)
             self.pert_delta[i] = delta_i
 
     def loss_function(self, x, x_hat, p, p_hat, mean_z, log_var_z, s, s_marginal, T):
