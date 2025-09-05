@@ -76,7 +76,7 @@ class Trainer:
         # control cells
         ctrl_x = adata[adata.obs['condition'].values == 'ctrl'].X
         self.ctrl_mean = np.mean(ctrl_x, axis=0)
-        self.ctrl_x = torch.from_numpy(ctrl_x - self.ctrl_mean.reshape(1, -1)).float().to(self.device)
+        self.ctrl_x = torch.from_numpy(ctrl_x - self.ctrl_mean.reshape(1, -1)).float().to(self.device) # TODO: keep in cpu
         X = self.adata.X - self.ctrl_mean.reshape(1, -1)
         X = X.toarray() if isinstance(X, csr_matrix) else X
 
@@ -100,8 +100,8 @@ class Trainer:
         self.model.to(self.device)
 
         self.train_data = PertDataset(
-            x=torch.from_numpy(X[train_mask]).float().to(self.device),
-            p=torch.from_numpy(self.pert_emb_cells[train_mask]).float().to(self.device),
+            x=torch.from_numpy(X[train_mask]).float(),
+            p=torch.from_numpy(self.pert_emb_cells[train_mask]).float(),
             ctrl_mean=self.model.ctrl_mean,
         )
         self.train_dataloader = torch.utils.data.DataLoader(
@@ -178,7 +178,7 @@ class Trainer:
                 p.requires_grad = True
                 self.model.eval()
                 with torch.enable_grad():
-                    x_hat, _, _, _, _ = self.model(x, p)
+                    x_hat, _, _, _, _ = self.model(x.to(self.device), p.to(self.device))
                     recon_loss = self.loss_recon(x, x_hat)
                     grads = torch.autograd.grad(recon_loss, p)[0]
                     p_ae = p + self.eps * torch.norm(p, dim=1).view(-1, 1) * torch.sign(grads.data) # generate adversarial examples
@@ -189,7 +189,7 @@ class Trainer:
                 # for MINE
                 index_marginal = np.random.choice(np.arange(len(self.train_data)), size=x_hat.shape[0])
                 p_marginal = self.train_data.p[index_marginal]
-                s_marginal = self.model.Net.Encoder_p(p_marginal)
+                s_marginal = self.model.Net.Encoder_p(p_marginal.to(self.device))
                 for _ in range(1):
                     optimizer_MINE.zero_grad()
                     loss = self.loss_MINE(mean_z, s, s_marginal, T=self.model.Net.MINE)
@@ -215,6 +215,7 @@ class Trainer:
                             pert_emb_p = self.gene_emb[i]
                         val_p = torch.from_numpy(np.tile(pert_emb_p, 
                                                          (self.ctrl_x.shape[0], 1))).float().to(self.device)
+                        # TODO: Split on batches? self.ctrl_x, val_p
                         x_hat, p_hat, mean_z, log_var_z, s = self.model.Net(self.ctrl_x, val_p)
                         x_hat = np.mean(x_hat.detach().cpu().numpy(), axis=0)
                         corr = np.corrcoef(x_hat, self.pert_delta[i])[0, 1]
